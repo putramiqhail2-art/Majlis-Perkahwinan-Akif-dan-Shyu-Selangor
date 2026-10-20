@@ -881,6 +881,33 @@
 
 </main>
 
+<!-- Firebase Firestore (PERCUMA) — projek "Projek2": ucapan & kehadiran majlis kad MERAH sahaja -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // EDIT: tampal config projek "Projek2" — Firebase Console > Project settings (ikon gear)
+  // > tatal ke "Your apps" > aplikasi web (ikon </>) > Config. Gantikan semua "ISI_...".
+  // (Kalau belum ada aplikasi web, klik "Add app" > ikon web </> dulu.)
+  const firebaseConfigMerah = {
+    apiKey: "ISI_API_KEY",
+    authDomain: "projek2-12111.firebaseapp.com",
+    projectId: "projek2-12111",
+    storageBucket: "ISI_STORAGE_BUCKET",
+    messagingSenderId: "ISI_MESSAGING_SENDER_ID",
+    appId: "ISI_APP_ID"
+  };
+  const FS_BELUM_DIISI = /^ISI_/.test(firebaseConfigMerah.apiKey);
+  let fsDb = null;
+  if(!FS_BELUM_DIISI){
+    firebase.initializeApp(firebaseConfigMerah);
+    fsDb = firebase.firestore();
+  } else {
+    console.warn('Firebase belum disambung: isi firebaseConfigMerah dalam fail ini.');
+  }
+  // Nama koleksi dalam Firestore Projek2
+  const GB_KOLEKSI = 'ucapan';   // buku ucapan
+  const GB_RSVP    = 'rsvp';     // pengesahan kehadiran (private)
+</script>
 <script>
 (function(){
   /* ---------- Reveal on scroll ---------- */
@@ -1094,46 +1121,58 @@
     });
   });
 
-  /* ---------- Formspree submit helper ---------- */
-  function bindForm(formId, endpoint, msgId, onSuccess){
-    var form = document.getElementById(formId);
-    var msg = document.getElementById(msgId);
+  /* ---------- Kehadiran disimpan ke Firestore (koleksi "rsvp") ---------- */
+  /* Senarai RSVP PRIVATE: tetamu hanya boleh tambah. Awak lihat senarai di
+     Firebase Console > Firestore Database > Data > rsvp. */
+  (function(){
+    var form = document.getElementById('form-hadir');
+    var msg = document.getElementById('msg-hadir');
     form.addEventListener('submit', function(ev){
       ev.preventDefault();
+      msg.textContent = '';
+      msg.className = 'form-msg';
+      if(!fsDb){
+        msg.textContent = 'Firebase belum disambung (config belum diisi dalam fail).';
+        msg.classList.add('err');
+        return;
+      }
       var btn = form.querySelector('.submit-btn');
+      var nama = document.getElementById('h-name').value.trim();
+      var pilih = form.querySelector('input[name="Kehadiran"]:checked');
+      var hadir = pilih ? pilih.value : 'Hadir';
+      var bil = hadir === 'Hadir' ? parseInt(paxInput.value, 10) : 0;
+      if(!nama || (hadir === 'Hadir' && (!bil || bil < 1))){
+        msg.textContent = 'Sila lengkapkan nama dan bilangan tetamu.';
+        msg.classList.add('err');
+        return;
+      }
+      bil = Math.min(bil, 20); // had 20 seorang (sepadan dengan Firestore rules)
       btn.disabled = true;
       var original = btn.textContent;
       btn.textContent = 'Menghantar...';
-      msg.textContent = '';
-      msg.className = 'form-msg';
-
-      var data = new FormData(form);
-      fetch(endpoint, {
-        method:'POST',
-        body:data,
-        headers:{ 'Accept':'application/json' }
-      }).then(function(res){
-        if(res.ok){
-          msg.textContent = 'Terima kasih! Maklumat anda telah diterima.';
-          msg.classList.add('ok');
-          if(onSuccess) onSuccess(data);
-          form.reset();
-        } else {
-          return res.json().then(function(j){ throw new Error((j && j.error) || 'Ralat menghantar'); });
-        }
+      fsDb.collection(GB_RSVP).add({
+        nama: nama.slice(0, 60),
+        status: hadir === 'Hadir' ? 'Hadir' : 'Tidak Hadir',
+        bilangan: bil,
+        masa: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(function(){
+        msg.textContent = 'Terima kasih! Maklumat anda telah diterima.';
+        msg.classList.add('ok');
+        form.reset();
       }).catch(function(err){
-        msg.textContent = 'Maaf, gagal menghantar. Sila cuba lagi.';
+        console.error('Gagal simpan kehadiran ke Firestore:', err);
+        msg.textContent = (err && err.code === 'permission-denied')
+          ? 'Ditolak oleh pangkalan data (Firestore rules belum dibenarkan).'
+          : 'Maaf, gagal menghantar. Sila cuba lagi.';
         msg.classList.add('err');
       }).finally(function(){
         btn.disabled = false;
         btn.textContent = original;
       });
     });
-  }
+  })();
 
-  bindForm('form-hadir', 'https://formspree.io/f/mvkoqegg', 'msg-hadir');
-
-  /* Ucapan is saved to Firebase Realtime Database so every guest sees it in the Guest Book */
+  /* Ucapan is saved to Firebase Firestore so every guest sees it in the Guest Book */
   var formUcap = document.getElementById('form-ucap');
   var msgUcap = document.getElementById('msg-ucap');
   formUcap.addEventListener('submit', function(ev){
@@ -1155,16 +1194,22 @@
       return;
     }
 
-    addWishToFirebase(name, text).then(function(res){
-      if(!res.ok){ throw new Error('HTTP ' + res.status); }
+    if(!fsDb){
+      msgUcap.textContent = 'Firebase belum disambung (config belum diisi dalam fail).';
+      msgUcap.classList.add('err');
+      btn.disabled = false;
+      btn.textContent = original;
+      return;
+    }
+    addWishToFirebase(name, text).then(function(){
       msgUcap.textContent = 'Terima kasih! Ucapan anda telah dihantar.';
       msgUcap.classList.add('ok');
-      formUcap.reset();
-      refreshWishes(false);
+      formUcap.reset();   // senarai dikemas kini sendiri oleh pendengar masa nyata di bawah
     }).catch(function(err){
-      var denied = err && /401|403/.test(err.message || '');
+      console.error('Gagal simpan ucapan ke Firestore:', err);
+      var denied = err && err.code === 'permission-denied';
       msgUcap.textContent = denied
-        ? 'Ucapan ditolak oleh pangkalan data (Firebase rules belum dibenarkan).'
+        ? 'Ucapan ditolak oleh pangkalan data (Firestore rules belum dibenarkan).'
         : 'Maaf, gagal menghantar. Sila cuba lagi.';
       msgUcap.classList.add('err');
     }).finally(function(){
@@ -1179,17 +1224,13 @@
     return div.innerHTML;
   }
 
-  /* ---------- Guest Book (Firebase Realtime Database) ---------- */
-  var FIREBASE_DB_URL = 'https://projek2-12111-default-rtdb.asia-southeast1.firebasedatabase.app';
-  var GUESTBOOK_ENDPOINT = FIREBASE_DB_URL + '/guestbook.json';
-
+  /* ---------- Guest Book (Firebase Firestore) ---------- */
   var GB_PER_SLAID = 6;      // bilangan ucapan setiap slaid
   var GB_MASA      = 10000;  // 10 saat (milisaat) — tukar kalau nak lebih laju/perlahan
   var gbWishes = [];
   var gbSlaid = 0;
   var gbTimer = null;
   var gbJeda = false;
-  var gbSig = '';
   var gbTrackEl  = document.getElementById('gb-track');
   var gbDotsEl   = document.getElementById('gb-dots');
   var gbBarEl    = document.getElementById('gb-progress');
@@ -1287,56 +1328,32 @@
     }
   }, {passive:true});
 
-  function refreshWishes(keepPosition){
-    fetch(GUESTBOOK_ENDPOINT)
-      .then(function(res){ return res.json(); })
-      .then(function(data){
-        var fetched = [];
-        if(data && !data.error){
-          Object.keys(data).forEach(function(key){
-            var v = data[key];
-            if(v && v.text && v.name){
-              fetched.push({ name:v.name, text:v.text, ts:v.ts || 0 });
-            }
-          });
-          fetched.sort(function(a,b){ return b.ts - a.ts; }); // terbaru dahulu
-        }
-        var sig = fetched.length + '|' + (fetched.length ? fetched[0].ts : 0);
-        if(sig === gbSig) return;                      // tiada perubahan — jangan bina semula
-        var adaBaharu = gbWishes.length > 0 && fetched.length > gbWishes.length;
-        gbSig = sig;
-        gbWishes = fetched;
-        gbBina(!keepPosition || adaBaharu);            // ucapan baharu → terus ke slaid pertama
-      })
-      .catch(function(){ /* Firebase tak dapat dihubungi - kekalkan ucapan sedia ada */ });
-  }
+  // Dengar ucapan secara masa nyata — setiap ucapan baharu terus muncul untuk semua tetamu
+  var gbPertama = true;
+  if(fsDb) fsDb.collection(GB_KOLEKSI).orderBy('masa', 'desc').limit(50)
+    .onSnapshot(function(snap){
+      // 'modified' = cuma cap masa pelayan disahkan; tak perlu bina semula slaid
+      var adaPerubahan = snap.docChanges().some(function(c){ return c.type !== 'modified'; });
+      if(!adaPerubahan && !gbPertama) return;
+      var fetched = [];
+      snap.docs.forEach(function(d){
+        var v = d.data();
+        if(v && v.teks && v.nama) fetched.push({ name:v.nama, text:v.teks });
+      });
+      gbWishes = fetched;
+      gbBina(!gbPertama);   // ucapan baharu → terus ke slaid pertama
+      gbPertama = false;
+    }, function(err){
+      console.error('Gagal muatkan ucapan dari Firestore:', err);
+    });
 
   function addWishToFirebase(name, text){
-    return fetch(GUESTBOOK_ENDPOINT, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ name:name, text:text, ts: Date.now() })
+    return fsDb.collection(GB_KOLEKSI).add({
+      nama: name.slice(0, 60),
+      teks: text.slice(0, 500),
+      masa: firebase.firestore.FieldValue.serverTimestamp()
     });
   }
-
-  refreshWishes(false);
-
-  /* Masa nyata: Firebase hantar isyarat (Server-Sent Events) setiap kali ada
-     ucapan baharu, jadi senarai dikemas kini serta-merta tanpa tunggu. */
-  var gbFirst = true;
-  if(window.EventSource){
-    try {
-      var gbStream = new EventSource(GUESTBOOK_ENDPOINT);
-      var onChange = function(){
-        if(gbFirst){ gbFirst = false; return; } // data awal sudah dimuat di atas
-        refreshWishes(true);
-      };
-      gbStream.addEventListener('put', onChange);
-      gbStream.addEventListener('patch', onChange);
-    } catch(e) {}
-  }
-  /* sandaran: semak semula setiap 30 saat jika sambungan terputus */
-  setInterval(function(){ refreshWishes(true); }, 30000);
 
 })();
 </script>
