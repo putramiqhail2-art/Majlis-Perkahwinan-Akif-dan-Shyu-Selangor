@@ -888,14 +888,14 @@
   // EDIT: tampal config projek "Projek2" — Firebase Console > Project settings (ikon gear)
   // > tatal ke "Your apps" > aplikasi web (ikon </>) > Config. Gantikan semua "ISI_...".
   // (Kalau belum ada aplikasi web, klik "Add app" > ikon web </> dulu.)
-  const firebaseConfigMerah = {
-    apiKey: "ISI_API_KEY",
-    authDomain: "projek2-12111.firebaseapp.com",
-    projectId: "projek2-12111",
-    storageBucket: "ISI_STORAGE_BUCKET",
-    messagingSenderId: "ISI_MESSAGING_SENDER_ID",
-    appId: "ISI_APP_ID"
-  };
+const firebaseConfigMerah = {
+  apiKey: "AIzaSyB9oCrlG4bUetLwot1TtM8nAGrJFuXFpvA",
+  authDomain: "projek2-12111.firebaseapp.com",
+  projectId: "projek2-12111",
+  storageBucket: "projek2-12111.firebasestorage.app",
+  messagingSenderId: "415084080632",
+  appId: "1:415084080632:web:f1b327fccd82eb3d5bba0d"
+};
   const FS_BELUM_DIISI = /^ISI_/.test(firebaseConfigMerah.apiKey);
   let fsDb = null;
   if(!FS_BELUM_DIISI){
