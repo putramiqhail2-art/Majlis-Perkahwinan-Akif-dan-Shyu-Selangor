@@ -1121,6 +1121,22 @@ const firebaseConfigMerah = {
   /* Senarai RSVP PRIVATE: tetamu hanya boleh tambah. Awak lihat senarai di
      Firebase Console > Firestore Database > Data > rsvp. */
   (function(){
+    /* Anti-duplicate: ID dokumen = nama yang dinormalkan (huruf kecil, tanpa simbol).
+       Nama sama => dokumen sama, jadi submit berulang tak jadi baris baru. */
+    function rsvpId(nama){
+      var id = nama.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 60);
+      return id || ('tetamu-' + Date.now());
+    }
+    function sudahHantar(id){
+      try { return localStorage.getItem('rsvp_hantar_' + id) === '1'; } catch(e){ return false; }
+    }
+    function tandaHantar(id){
+      try { localStorage.setItem('rsvp_hantar_' + id, '1'); } catch(e){}
+    }
     var form = document.getElementById('form-hadir');
     var msg = document.getElementById('msg-hadir');
     form.addEventListener('submit', function(ev){
@@ -1143,24 +1159,36 @@ const firebaseConfigMerah = {
         return;
       }
       bil = Math.min(bil, 20); // had 20 seorang (sepadan dengan Firestore rules)
+      var docId = rsvpId(nama);
+      if(sudahHantar(docId)){
+        msg.textContent = 'Kehadiran atas nama ini sudah direkodkan. Terima kasih!';
+        msg.classList.add('ok');
+        return;
+      }
       btn.disabled = true;
       var original = btn.textContent;
       btn.textContent = 'Menghantar...';
-      fsDb.collection(GB_RSVP).add({
+      fsDb.collection(GB_RSVP).doc(docId).set({
         nama: nama.slice(0, 60),
         status: hadir === 'Hadir' ? 'Hadir' : 'Tidak Hadir',
         bilangan: bil,
         masa: firebase.firestore.FieldValue.serverTimestamp()
       }).then(function(){
+        tandaHantar(docId);
         msg.textContent = 'Terima kasih! Maklumat anda telah diterima.';
         msg.classList.add('ok');
         form.reset();
       }).catch(function(err){
         console.error('Gagal simpan kehadiran ke Firestore:', err);
-        msg.textContent = (err && err.code === 'permission-denied')
-          ? 'Ditolak oleh pangkalan data (Firestore rules belum dibenarkan).'
-          : 'Maaf, gagal menghantar. Sila cuba lagi.';
-        msg.classList.add('err');
+        if(err && err.code === 'permission-denied'){
+          /* Dokumen dengan nama ini sudah wujud (rules hanya benarkan 'create') */
+          tandaHantar(docId);
+          msg.textContent = 'Kehadiran atas nama ini sudah direkodkan. Terima kasih!';
+          msg.classList.add('ok');
+        } else {
+          msg.textContent = 'Maaf, gagal menghantar. Sila cuba lagi.';
+          msg.classList.add('err');
+        }
       }).finally(function(){
         btn.disabled = false;
         btn.textContent = original;
