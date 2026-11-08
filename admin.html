@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Admin RSVP</title>
+<style>
+  :root{
+    --bg:#f5f6f3;
+    --card:#ffffff;
+    --ink:#1d2a26;
+    --muted:#667570;
+    --line:#dfe3df;
+    --green:#2f5d50;
+    --green-soft:#e4eee9;
+    --gold:#a67c1f;
+    --red:#b3261e;
+    --red-soft:#fbe9e7;
+    --amber-soft:#fff3d6;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:15px; line-height:1.5;
+  }
+  [hidden]{ display:none !important; }
+  button,input,select{ font:inherit; color:inherit; }
+  button:focus-visible,input:focus-visible,select:focus-visible{ outline:2px solid var(--green); outline-offset:2px; }
+
+  /* ---------- Login ---------- */
+  .login{ min-height:100vh; display:grid; place-items:center; padding:24px; }
+  .login__box{ width:100%; max-width:360px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:28px; }
+  .login__box h1{ font-family:Georgia,"Iowan Old Style",serif; font-weight:400; font-size:26px; margin:0 0 4px; }
+  .login__box p{ margin:0 0 20px; color:var(--muted); }
+  .field{ display:block; margin-bottom:14px; }
+  .field span{ display:block; font-size:13px; color:var(--muted); margin-bottom:4px; }
+  .field input{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .btn{
+    background:var(--green); color:#fff; border:0; border-radius:6px;
+    padding:10px 16px; cursor:pointer; font-weight:500;
+  }
+  .btn:disabled{ opacity:.55; cursor:default; }
+  .btn--full{ width:100%; }
+  .btn--ghost{ background:transparent; color:var(--ink); border:1px solid var(--line); }
+  .btn--small{ padding:6px 10px; font-size:13px; }
+  .error{ color:var(--red); font-size:13px; margin:10px 0 0; min-height:18px; }
+
+  /* ---------- App ---------- */
+  .wrap{ max-width:980px; margin:0 auto; padding:20px 16px 60px; }
+  .top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
+  .top h1{ font-size:17px; font-weight:600; margin:0; }
+  .top small{ color:var(--muted); display:block; font-weight:400; }
+
+  .total{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:26px 24px; margin-bottom:12px;
+  }
+  .total__num{
+    font-family:Georgia,"Iowan Old Style",serif; font-size:clamp(64px,16vw,104px);
+    line-height:1; color:var(--green); letter-spacing:-.02em;
+  }
+  .total__label{ color:var(--muted); margin-top:6px; }
+
+  .stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
+  .stat{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .stat b{ display:block; font-size:24px; font-weight:600; }
+  .stat span{ color:var(--muted); font-size:13px; }
+
+  .notice{
+    background:var(--amber-soft); border:1px solid #ecd596; border-radius:8px;
+    padding:10px 14px; margin-bottom:16px; font-size:14px;
+  }
+
+  .tools{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .tools input[type=search]{ flex:1 1 200px; padding:9px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .tools select{ padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+
+  .tablewrap{ background:var(--card); border:1px solid var(--line); border-radius:10px; overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; min-width:560px; }
+  th,td{ text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th{ font-size:13px; font-weight:500; color:var(--muted); background:#fafbf9; position:sticky; top:0; }
+  tr:last-child td{ border-bottom:0; }
+  td.num,th.num{ text-align:right; }
+  .pill{ display:inline-block; padding:2px 9px; border-radius:99px; font-size:12.5px; }
+  .pill--ya{ background:var(--green-soft); color:var(--green); }
+  .pill--tidak{ background:var(--red-soft); color:var(--red); }
+  .dup{ display:inline-block; margin-left:6px; font-size:12px; background:var(--amber-soft); color:#7a5a00; padding:1px 7px; border-radius:99px; }
+  .time{ color:var(--muted); font-size:13px; white-space:nowrap; }
+  .del{ background:transparent; border:0; color:var(--red); cursor:pointer; padding:4px 6px; border-radius:4px; }
+  .del:hover{ background:var(--red-soft); }
+  .empty{ padding:28px; text-align:center; color:var(--muted); }
+
+  @media (max-width:560px){
+    .stats{ grid-template-columns:1fr; }
+    .total{ padding:20px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOG MASUK ============ -->
+<section class="login" id="login">
+  <form class="login__box" id="login-form">
+    <h1>Admin RSVP</h1>
+    <p>Log masuk untuk lihat senarai kehadiran.</p>
+    <label class="field"><span>Emel</span>
+      <input type="email" id="emel" autocomplete="username" required>
+    </label>
+    <label class="field"><span>Kata laluan</span>
+      <input type="password" id="kata" autocomplete="current-password" required>
+    </label>
+    <button class="btn btn--full" id="btn-login" type="submit">Log masuk</button>
+    <p class="error" id="login-err" role="alert"></p>
+  </form>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<main class="wrap" id="app" hidden>
+  <div class="top">
+    <h1>Kehadiran tetamu <small id="user-emel"></small></h1>
+    <button class="btn btn--ghost btn--small" id="btn-keluar" type="button">Log keluar</button>
+  </div>
+
+  <div class="total">
+    <div class="total__num" id="s-hadir-orang">0</div>
+    <div class="total__label">orang akan hadir (jumlah bilangan tetamu)</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="s-hadir-ref">0</b><span>nama / keluarga hadir</span></div>
+    <div class="stat"><b id="s-tidak">0</b><span>tidak hadir</span></div>
+    <div class="stat"><b id="s-jumlah">0</b><span>jumlah RSVP diterima</span></div>
+  </div>
+
+  <div class="notice" id="notice-dup" hidden></div>
+  <p class="error" id="app-err" role="alert"></p>
+
+  <div class="tools">
+    <input type="search" id="cari" placeholder="Cari nama..." aria-label="Cari nama">
+    <select id="tapis" aria-label="Tapis status">
+      <option value="semua">Semua</option>
+      <option value="Hadir">Hadir</option>
+      <option value="Tidak Hadir">Tidak hadir</option>
+      <option value="dup">Nama serupa sahaja</option>
+    </select>
+    <button class="btn btn--small" id="btn-csv" type="button">Muat turun CSV</button>
+  </div>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nama</th>
+          <th>Status</th>
+          <th class="num">Bilangan</th>
+          <th>Masa</th>
+          <th><span class="sr-only" style="position:absolute;left:-9999px">Tindakan</span></th>
+        </tr>
+      </thead>
+      <tbody id="badan"></tbody>
+    </table>
+    <div class="empty" id="kosong" hidden>Belum ada RSVP yang sepadan.</div>
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // Config sama dengan kad jemputan (config Firebase untuk web memang boleh didedahkan;
+  // keselamatan dikawal oleh Firestore Rules + log masuk).
+  const firebaseConfig = {
+    apiKey: "AIzaSyBWWhbSd3KQF10DsF9yV02xqcT0ZwdFKd0",
+    authDomain: "perkahwinan-abekih.firebaseapp.com",
+    projectId: "perkahwinan-abekih",
+    storageBucket: "perkahwinan-abekih.firebasestorage.app",
+    messagingSenderId: "100609966164",
+    appId: "1:100609966164:web:1d9b61227e836c3176edc1"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  const $ = id => document.getElementById(id);
+  let semua = [];
+  let berhenti = null;
+
+  // ---------- Kunci untuk kesan nama serupa: "iqaaa" = "Iqa" = "IQA " ----------
+  function kunci(nama){
+    return String(nama || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '')
+      .replace(/(.)\1+/g, '$1');
+  }
+
+  // ---------- Log masuk / keluar ----------
+  $('login-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const btn = $('btn-login');
+    btn.disabled = true;
+    $('login-err').textContent = '';
+    auth.signInWithEmailAndPassword($('emel').value.trim(), $('kata').value)
+      .catch(() => { $('login-err').textContent = 'Emel atau kata laluan salah. Cuba lagi.'; })
+      .finally(() => { btn.disabled = false; });
+  });
+  $('btn-keluar').addEventListener('click', () => auth.signOut());
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      $('login').hidden = true;
+      $('app').hidden = false;
+      $('user-emel').textContent = user.email || '';
+      mula();
+    } else {
+      if (berhenti) { berhenti(); berhenti = null; }
+      semua = [];
+      $('app').hidden = true;
+      $('login').hidden = false;
+      $('kata').value = '';
+    }
+  });
+
+  // ---------- Baca data masa nyata ----------
+  function mula(){
+    if (berhenti) berhenti();
+    berhenti = db.collection('rsvp').onSnapshot(snap => {
+      $('app-err').textContent = '';
+      semua = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      semua.sort((a, b) => saat(b.masa) - saat(a.masa));
+      papar();
+    }, err => {
+      console.error(err);
+      $('app-err').textContent = err.code === 'permission-denied'
+        ? 'Akses ditolak. Semak Firestore Rules: emel anda mesti dibenarkan membaca koleksi "rsvp".'
+        : 'Gagal memuat data: ' + (err.message || err.code);
+    });
+  }
+
+  function saat(ts){ return ts && ts.toMillis ? ts.toMillis() : 0; }
+  function formatMasa(ts){
+    if (!ts || !ts.toDate) return '';
+    return ts.toDate().toLocaleString('ms-MY', { day:'numeric', month:'short', hour:'numeric', minute:'2-digit' });
+  }
+
+  // ---------- Papar ----------
+  function papar(){
+    // Statistik
+    let orang = 0, hadirRef = 0, tidak = 0;
+    const kiraKunci = {};
+    semua.forEach(r => {
+      const k = kunci(r.nama);
+      kiraKunci[k] = (kiraKunci[k] || 0) + 1;
+      if (r.status === 'Hadir') { hadirRef++; orang += Number(r.bilangan) || 0; }
+      else tidak++;
+    });
+    $('s-hadir-orang').textContent = orang;
+    $('s-hadir-ref').textContent = hadirRef;
+    $('s-tidak').textContent = tidak;
+    $('s-jumlah').textContent = semua.length;
+
+    const dupKeys = Object.keys(kiraKunci).filter(k => k && kiraKunci[k] > 1);
+    const nd = $('notice-dup');
+    if (dupKeys.length) {
+      nd.hidden = false;
+      nd.textContent = dupKeys.length + ' kumpulan nama nampak serupa. Semak dalam senarai (tapis "Nama serupa sahaja") dan padam yang berulang supaya jumlah tepat.';
+    } else {
+      nd.hidden = true;
+    }
+
+    // Tapis & cari
+    const q = $('cari').value.trim().toLowerCase();
+    const tapis = $('tapis').value;
+    const senarai = semua.filter(r => {
+      if (q && !String(r.nama || '').toLowerCase().includes(q)) return false;
+      if (tapis === 'Hadir' || tapis === 'Tidak Hadir') return r.status === tapis;
+      if (tapis === 'dup') return kiraKunci[kunci(r.nama)] > 1;
+      return true;
+    });
+
+    // Bina baris (textContent sahaja, nama tetamu tidak dimasukkan sebagai HTML)
+    const badan = $('badan');
+    badan.textContent = '';
+    senarai.forEach(r => {
+      const tr = document.createElement('tr');
+
+      const tdNama = document.createElement('td');
+      tdNama.textContent = r.nama || '(tiada nama)';
+      if (kiraKunci[kunci(r.nama)] > 1) {
+        const d = document.createElement('span');
+        d.className = 'dup';
+        d.textContent = 'nama serupa';
+        tdNama.appendChild(d);
+      }
+      tr.appendChild(tdNama);
+
+      const tdStatus = document.createElement('td');
+      const pill = document.createElement('span');
+      pill.className = 'pill ' + (r.status === 'Hadir' ? 'pill--ya' : 'pill--tidak');
+      pill.textContent = r.status === 'Hadir' ? 'Hadir' : 'Tidak hadir';
+      tdStatus.appendChild(pill);
+      tr.appendChild(tdStatus);
+
+      const tdBil = document.createElement('td');
+      tdBil.className = 'num';
+      tdBil.textContent = r.status === 'Hadir' ? (Number(r.bilangan) || 0) : '-';
+      tr.appendChild(tdBil);
+
+      const tdMasa = document.createElement('td');
+      tdMasa.className = 'time';
+      tdMasa.textContent = formatMasa(r.masa);
+      tr.appendChild(tdMasa);
+
+      const tdDel = document.createElement('td');
+      const del = document.createElement('button');
+      del.className = 'del';
+      del.type = 'button';
+      del.textContent = 'Padam';
+      del.addEventListener('click', () => padam(r));
+      tdDel.appendChild(del);
+      tr.appendChild(tdDel);
+
+      badan.appendChild(tr);
+    });
+    $('kosong').hidden = senarai.length > 0;
+  }
+
+  $('cari').addEventListener('input', papar);
+  $('tapis').addEventListener('change', papar);
+
+  // ---------- Padam ----------
+  function padam(r){
+    if (!confirm('Padam RSVP "' + (r.nama || '') + '"? Tindakan ini tidak boleh dibatalkan.')) return;
+    db.collection('rsvp').doc(r.id).delete().catch(err => {
+      $('app-err').textContent = 'Gagal memadam: ' + (err.code === 'permission-denied'
+        ? 'Rules belum benarkan padam untuk akaun ini.' : (err.message || err.code));
+    });
+  }
+
+  // ---------- CSV ----------
+  function sel(v){
+    let s = String(v == null ? '' : v);
+    // elak formula Excel (=, +, -, @) daripada nama yang ditaip tetamu
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  $('btn-csv').addEventListener('click', () => {
+    const baris = [['Nama', 'Status', 'Bilangan', 'Masa'].map(sel).join(',')];
+    semua.slice().reverse().forEach(r => {
+      baris.push([r.nama, r.status, r.bilangan, formatMasa(r.masa)].map(sel).join(','));
+    });
+    const blob = new Blob(['\ufeff' + baris.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'rsvp-kahwin.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+</script>
+</body>
+</html>
